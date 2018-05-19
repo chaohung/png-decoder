@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstring>
 #include <stdexcept>
+#include <memory>
 
 namespace hsu {
 
@@ -64,19 +65,18 @@ static void decode_png(png_struct* png_ptr, png_info* info_ptr, png_info* end_in
     // allocate buf
     int rowbytes = png_get_rowbytes(png_ptr, info_ptr);
     img.buf.resize(rowbytes * height);
-    png_byte** row_pointers = (png_byte**)malloc(sizeof(png_byte*) * height);
+    std::unique_ptr<png_byte*> row_pointers(new png_byte*[height]);
     for (int i = 0; i < height; i++) {
-        row_pointers[i] = &img.buf[rowbytes * i];
+        row_pointers.get()[i] = &img.buf[rowbytes * i];
     }
     img.width = png_get_image_width(png_ptr, info_ptr);
     img.height = png_get_image_height(png_ptr, info_ptr);
 
     // decode png image
-    png_read_image(png_ptr, row_pointers);
+    png_read_image(png_ptr, row_pointers.get());
 
     png_read_end(png_ptr, info_ptr);
     png_destroy_read_struct(&png_ptr, &info_ptr, &end_info);
-    free(row_pointers);
 }
 
 rgba_img_data read_png(uint8_t const* data, size_t size) {
@@ -121,6 +121,7 @@ rgba_img_data read_png(char const* path) {
     char header[8];
 
     FILE* fp = fopen(path, "rb");
+    if (!fp) throw std::runtime_error("fopen failed.");
     fread(header, 1, 8, fp);
     if (png_sig_cmp((png_const_bytep)header, 0, 8)) {
         fclose(fp);
